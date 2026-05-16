@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Физика: Тренажер формул</title>
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --text: #1e293b;
+            --success: #16a34a;
+            --error: #dc2626;
+            --border: #e2e8f0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+            line-height: 1.5;
+        }
+        .card {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+        h1, h2, h3 { color: var(--text); }
+        .hidden { display: none !important; }
+        
+        /* Меню */
+        .menu-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 1rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        button:hover { opacity: 0.9; }
+        .menu-btn { background: var(--surface); color: var(--primary); border: 2px solid var(--primary); font-weight: 600;}
+        .menu-btn:hover { background: var(--primary); color: white; }
+
+        /* Квиз */
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1rem;
+            margin: 1.5rem 0;
+        }
+        .option-btn {
+            background: var(--surface);
+            color: var(--text);
+            border: 1px solid var(--border);
+            text-align: left;
+            font-size: 1.2rem;
+            padding: 1rem;
+        }
+        .option-btn:hover:not(:disabled) { border-color: var(--primary); }
+        .option-btn.correct { background: #dcfce7; border-color: var(--success); }
+        .option-btn.incorrect { background: #fee2e2; border-color: var(--error); }
+        
+        .explanation {
+            background: #f1f5f9;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+            border-left: 4px solid var(--primary);
+        }
+        .next-btn { width: 100%; margin-top: 1.5rem; }
+        .top-bar { display: flex; justify-content: space-between; margin-bottom: 1rem; font-size: 0.9rem; color: #64748b;}
+        
+        /* Результаты */
+        .results-actions { display: flex; gap: 1rem; margin-top: 2rem; flex-wrap: wrap;}
+        .btn-secondary { background: #64748b; }
+    </style>
+</head>
+<body>
+
+    <div id="menu-screen" class="card">
+        <h1>Тренажер формул</h1>
+        <p>Выберите тему для проверки знаний. Если вы ошибетесь, система запомнит это и предложит работу над ошибками.</p>
+        <div class="menu-grid" id="topics-container">
+            </div>
+    </div>
+
+    <div id="quiz-screen" class="card hidden">
+        <div class="top-bar">
+            <span id="quiz-topic-title">Тема</span>
+            <span id="quiz-progress">Вопрос 1 / 10</span>
+        </div>
+        <h2 id="question-text">Название формулы</h2>
+        <div class="options-grid" id="options-container">
+            </div>
+        <div id="explanation-box" class="explanation hidden">
+            <h3 style="margin-top: 0;">Пояснение:</h3>
+            <p id="explanation-text"></p>
+        </div>
+        <button id="next-btn" class="next-btn hidden">Следующий вопрос</button>
+    </div>
+
+    <div id="results-screen" class="card hidden">
+        <h2>Тест завершен!</h2>
+        <p id="score-text" style="font-size: 1.2rem; font-weight: bold;"></p>
+        <div class="results-actions">
+            <button id="review-btn" class="hidden">Работа над ошибками</button>
+            <button class="btn-secondary" onclick="showMenu()">Вернуться в меню</button>
+        </div>
+    </div>
+
+    <script>
+        // БАЗА ДАННЫХ ФОРМУЛ (Массив объектов)
+        // Формат LaTeX требует двойного слэша для спецсимволов в JS строках (например, \\frac вместо \frac)
+        const db = {
+            "magnetism": [
+                {
+                    question: "Индукция магнитного поля через силу Ампера",
+                    options: [
+                        "\\( B = \\mu \\mu_0 H \\)",
+                        "\\( F_A = B I L \\sin\\alpha \\)",
+                        "\\( B = \\frac{F}{I \\cdot L} \\)",
+                        "\\( B = \\frac{M}{p_m} \\)"
+                    ],
+                    correctIndex: 2,
+                    explanations: [
+                        "Это формула связи индукции (B) и напряженности (H) магнитного поля среды.",
+                        "Это формула самой силы Ампера, а не выражения индукции через нее.",
+                        "Правильно! Магнитная индукция определяется как отношение силы Ампера к силе тока и длине участка проводника.",
+                        "Это выражение индукции через максимальный механический момент и магнитный момент контура."
+                    ]
+                },
+                {
+                    question: "Сила взаимодействия двух параллельных токов",
+                    options: [
+                        "\\( F_A = B I L \\sin\\alpha \\)",
+                        "\\( F = \\frac{\\mu \\mu_0 I_1 I_2}{2\\pi r} \\)",
+                        "\\( F_Л = q B v \\sin\\alpha \\)",
+                        "\\( B = \\frac{\\mu \\mu_0 I}{2\\pi R} \\)"
+                    ],
+                    correctIndex: 1,
+                    explanations: [
+                        "Это сила Ампера, действующая на один проводник в магнитном поле.",
+                        "Верно! Это сила взаимодействия бесконечных параллельных проводников с токами на единицу длины.",
+                        "Это сила Лоренца, действующая на движущийся точечный заряд.",
+                        "Это магнитная индукция поля бесконечного прямого проводника."
+                    ]
+                }
+            ],
+            "oscillations": [
+                {
+                    question: "Частота затухающих колебаний",
+                    options: [
+                        "\\( \\omega_0 = \\frac{1}{\\sqrt{LC}} \\)",
+                        "\\( \\omega = \\sqrt{\\omega_0^2 + \\beta^2} \\)",
+                        "\\( \\omega = \\frac{2\\pi}{T} \\)",
+                        "\\( \\omega = \\sqrt{\\frac{1}{LC} - \\frac{R^2}{4L^2}} \\)"
+                    ],
+                    correctIndex: 3,
+                    explanations: [
+                        "Это собственная (резонансная) частота идеального контура без затухания (формула Томсона).",
+                        "Неверный знак. Затухание всегда уменьшает частоту колебаний, поэтому под корнем должен быть минус.",
+                        "Это общая формула связи циклической частоты и периода, она не раскрывает суть именно затухающих колебаний контура.",
+                        "Верно! Это \\( \\sqrt{\\omega_0^2 - \\beta^2} \\), расписанная через параметры контура (R, L, C)."
+                    ]
+                },
+                {
+                    question: "Дифференциальное уравнение свободных колебаний (гармонических)",
+                    options: [
+                        "\\( x'' + \\omega^2 x = 0 \\)",
+                        "\\( q'' + 2\\beta q' + \\omega_0^2 q = 0 \\)",
+                        "\\( x = x_{max}\\cos(\\omega t + \\varphi_0) \\)",
+                        "\\( q'' + 2\\beta q' + \\omega^2 q = \\frac{\\mathcal{E}_m}{L}\\cos\\omega t \\)"
+                    ],
+                    correctIndex: 0,
+                    explanations: [
+                        "Правильно! Вторая производная координаты плюс квадрат циклической частоты на координату равно нулю.",
+                        "Это уравнение для затухающих колебаний (присутствует коэффициент затухания \\( \\beta \\)).",
+                        "Это не дифференциальное уравнение, а его решение (уравнение гармонического колебания).",
+                        "Это уравнение вынужденных колебаний (справа стоит внешняя вынуждающая сила/ЭДС)."
+                    ]
+                }
+            ],
+            "optics": [
+                {
+                    question: "Радиус темных колец Ньютона (в отраженном свете)",
+                    options: [
+                        "\\( r_k = \\sqrt{(k - 0.5) R \\lambda} \\)",
+                        "\\( r_k = \\sqrt{k R \\lambda} \\)",
+                        "\\( r_k = \\sqrt{\\frac{2R\\lambda}{n}} \\)",
+                        "\\( \\Delta = 2hn\\cos\\beta \\pm \\frac{\\lambda}{2} \\)"
+                    ],
+                    correctIndex: 1,
+                    explanations: [
+                        "Эта формула соответствует радиусам светлых колец (условие максимумов с учетом потери полуволны).",
+                        "Верно! Условие минимумов для темных колец в отраженном свете.",
+                        "Это неточная общая форма записи радиуса, требующая уточнений про номер кольца.",
+                        "Это оптическая разность хода в тонких пленках, а не формула радиуса кольца."
+                    ]
+                }
+            ],
+            "quantum": [
+                {
+                    question: "Давление света при полном зеркальном отражении",
+                    options: [
+                        "\\( p = \\frac{I}{c} \\)",
+                        "\\( p = \\frac{2I}{c} \\)",
+                        "\\( p = \\frac{I}{c}(1 + \\rho) \\)",
+                        "\\( p = \\frac{2I}{S} \\)"
+                    ],
+                    correctIndex: 1,
+                    explanations: [
+                        "Это давление на абсолютно черную (поглощающую) поверхность, где \\( \\rho = 0 \\).",
+                        "Верно! При полном отражении фотон передает двойной импульс, поэтому коэффициент отражения \\( \\rho = 1 \\), и формула удваивается.",
+                        "Это общая формула для любого коэффициента отражения, но нас спросили конкретно про полное отражение.",
+                        "Это ошибочная запись (площадь S в знаменателе вместо скорости света c)."
+                    ]
+                }
+            ]
+        };
+
+        const topicsMeta = {
+            "magnetism": "Магнетизм",
+            "oscillations": "Колебания",
+            "optics": "Волновая оптика",
+            "quantum": "Квантовая оптика"
+        };
+
+        // Состояние приложения
+        let currentQuestions = [];
+        let mistakesQueue = [];
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let isReviewMode = false;
+        let hasAnsweredCurrent = false;
+
+        // Инициализация меню
+        function init() {
+            const container = document.getElementById('topics-container');
+            for (const [key, title] of Object.entries(topicsMeta)) {
+                const btn = document.createElement('button');
+                btn.className = 'menu-btn';
+                btn.innerText = title;
+                btn.onclick = () => startQuiz(key);
+                container.appendChild(btn);
+            }
+        }
+
+        // Рендер формул MathJax
+        function typeset() {
+            if (window.MathJax) {
+                MathJax.typesetPromise().catch((err) => console.log(err.message));
+            }
+        }
+
+        function switchScreen(screenId) {
+            document.getElementById('menu-screen').classList.add('hidden');
+            document.getElementById('quiz-screen').classList.add('hidden');
+            document.getElementById('results-screen').classList.add('hidden');
+            document.getElementById(screenId).classList.remove('hidden');
+        }
+
+        function showMenu() {
+            switchScreen('menu-screen');
+        }
+
+        function startQuiz(topicKey) {
+            currentQuestions = [...db[topicKey]];
+            // Перемешиваем вопросы
+            currentQuestions.sort(() => Math.random() - 0.5);
+            mistakesQueue = [];
+            currentQuestionIndex = 0;
+            score = 0;
+            isReviewMode = false;
+            
+            document.getElementById('quiz-topic-title').innerText = topicsMeta[topicKey];
+            switchScreen('quiz-screen');
+            renderQuestion();
+        }
+
+        function startMistakesReview() {
+            currentQuestions = [...mistakesQueue];
+            mistakesQueue = [];
+            currentQuestionIndex = 0;
+            score = 0;
+            isReviewMode = true;
+            
+            document.getElementById('quiz-topic-title').innerText = "Работа над ошибками";
+            switchScreen('quiz-screen');
+            renderQuestion();
+        }
+
+        function renderQuestion() {
+            hasAnsweredCurrent = false;
+            document.getElementById('explanation-box').classList.add('hidden');
+            document.getElementById('next-btn').classList.add('hidden');
+            
+            const q = currentQuestions[currentQuestionIndex];
+            document.getElementById('quiz-progress').innerText = `Вопрос ${currentQuestionIndex + 1} / ${currentQuestions.length}`;
+            document.getElementById('question-text').innerText = q.question;
+            
+            const optionsContainer = document.getElementById('options-container');
+            optionsContainer.innerHTML = '';
+            
+            q.options.forEach((opt, index) => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn';
+                btn.innerHTML = opt;
+                btn.onclick = () => handleAnswer(index, btn);
+                optionsContainer.appendChild(btn);
+            });
+            
+            typeset();
+        }
+
+        function handleAnswer(selectedIndex, btnElement) {
+            if (hasAnsweredCurrent) return;
+            hasAnsweredCurrent = true;
+            
+            const q = currentQuestions[currentQuestionIndex];
+            const isCorrect = selectedIndex === q.correctIndex;
+            
+            const allBtns = document.querySelectorAll('.option-btn');
+            allBtns.forEach(btn => btn.disabled = true);
+            
+            if (isCorrect) {
+                btnElement.classList.add('correct');
+                score++;
+            } else {
+                btnElement.classList.add('incorrect');
+                allBtns[q.correctIndex].classList.add('correct');
+                // Сохраняем в ошибки, если еще нет
+                if (!mistakesQueue.includes(q)) {
+                    mistakesQueue.push(q);
+                }
+            }
+            
+            // Показываем объяснение выбранного варианта
+            const expBox = document.getElementById('explanation-box');
+            document.getElementById('explanation-text').innerText = q.explanations[selectedIndex];
+            expBox.classList.remove('hidden');
+            
+            const nextBtn = document.getElementById('next-btn');
+            nextBtn.classList.remove('hidden');
+            nextBtn.onclick = () => {
+                currentQuestionIndex++;
+                if (currentQuestionIndex < currentQuestions.length) {
+                    renderQuestion();
+                } else {
+                    showResults();
+                }
+            };
+        }
+
+        function showResults() {
+            switchScreen('results-screen');
+            const resultText = `Вы ответили верно на ${score} из ${currentQuestions.length} вопросов.`;
+            document.getElementById('score-text').innerText = resultText;
+            
+            const reviewBtn = document.getElementById('review-btn');
+            if (mistakesQueue.length > 0) {
+                reviewBtn.classList.remove('hidden');
+                reviewBtn.innerText = `Работа над ошибками (${mistakesQueue.length})`;
+                reviewBtn.onclick = startMistakesReview;
+            } else {
+                reviewBtn.classList.add('hidden');
+            }
+        }
+
+        // Запуск
+        init();
+    </script>
+</body>
+</html>
